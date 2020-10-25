@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>使用LL算法构建AST</title>
+</head>
+<body>
+    
+    <script>
+        const reg = /([0-9\.]+)|([ \t]+)|([\n\r]+)|(\/)|(\+)|(\-)|(\*)/g;
+        const dictionary = ['Number', 'WhiteSpace', 'LineTerminator', '/', '+', '-', '*'];
+
+        function* tokenize(source) {
+            let result = null;
+            let lastIndex = 0;
+            while(true) {
+                lastIndex = reg.lastIndex;
+                // console.log(lastIndex, '匹配前下一个匹配下标');
+                result = reg.exec(source);
+                // console.log(reg.lastIndex, '匹配后下一个匹配下标');
+                if (!result) break;
+
+                // 处理正则无法匹配的情况
+                if (reg.lastIndex - lastIndex > result[0].length) break;
+
+                let token = {
+                    type: null,
+                    value: null,
+                };
+                for (let i = 1; i <= dictionary.length; i++) {
+                    if (result[i]) {
+                        // console.log(dictionary[i - 1]);
+                        token.type = dictionary[i - 1];
+                    }
+                }
+                token.value = result[0];
+
+                yield token;
+            }
+            yield { type: 'EOF' };
+        }
+
+        let source = [];
+
+        // console.log(Object.prototype.toString.call(tokenize('1024 + 1 * 1025'))); // [object Generator]
+        for (const token of tokenize('1024 + 1 * 1025')) {
+            // console.log(token, 'token');
+            // 排除空格和换行
+            if (token.type !== 'WhiteSpace' && token.type !== 'LineTerminator') source.push(token);
+        }
+
+        function Expression(source) {
+            if (source[0].type === 'AdditiveExpression' && source[1] && source[1].type === 'EOF') {
+                const node = {
+                    type: 'EOF',
+                    children: [source[0]],
+                };
+                return node;
+            }
+
+            AdditiveExpression(source);
+            return Expression(source);
+        }
+
+        function AdditiveExpression(source) {
+            if (source[0].type === 'MultiplicationExpression') {
+                const node = {
+                    type: 'AdditiveExpression',
+                    children: [source[0]]
+                }
+                source[0] = node;
+                return AdditiveExpression(source);
+            }
+            if (source[0].type === 'AdditiveExpression' && source[1] && source[1].type === '+') {
+                let node = {
+                    type: 'AdditiveExpression',
+                    oprator: '+',
+                    children: [],
+                };
+
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                // 运算符后一项需要先转换成 expression
+                MultiplicationExpression(source);
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return AdditiveExpression(source);
+            }
+            if (source[0].type === 'AdditiveExpression' && source[1] && source[1].type === '-') {
+                let node = {
+                    type: 'AdditiveExpression',
+                    oprator: '-',
+                    children: [],
+                };
+
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                MultiplicationExpression(source);
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return AdditiveExpression(source);
+            }
+            if (source[0].type === 'AdditiveExpression') {
+                return source[0];
+            }
+
+            MultiplicationExpression(source);
+            return AdditiveExpression(source);
+        }
+
+        function MultiplicationExpression(source) {
+            // console.log(source)
+            if (source[0].type === 'Number') {
+                const node = {
+                    type: 'MultiplicationExpression',
+                    children: [source[0]]
+                }
+                source[0] = node;
+                return MultiplicationExpression(source);
+            }
+            if (source[0].type === 'MultiplicationExpression' && source[1] && source[1].type === '*') {
+                let node = {
+                    type: 'MultiplicationExpression',
+                    operator: '*',
+                    children: []
+                };
+
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return MultiplicationExpression(source);
+            }
+            if (source[0].type === 'MultiplicationExpression' && source[1] && source[1].type === '/') {
+                let node = {
+                    type: 'MultiplicationExpression',
+                    operator: '/',
+                    children: []
+                };
+
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return MultiplicationExpression(source);
+            }
+            if (source[0].type === 'MultiplicationExpression') {
+                return source[0];
+            }
+            return MultiplicationExpression(source);
+        }
+
+        // console.log(MultiplicationExpression(source));
+        // console.log(AdditiveExpression(source));
+        console.log(Expression(source));
+    </script>
+</body>
+</html>
