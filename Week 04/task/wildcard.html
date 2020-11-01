@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>wildcard</title>
+</head>
+<body>
+    <script>
+        function find(source, pattern) {
+            let starCount = 0;
+            // 记录*个数
+            for (let i = 0; i < pattern.length; i++) {
+                if (pattern[i] === '*') starCount += 1;
+            }
+            // 处理没有 * 情况
+            if (starCount === 0) {
+                for (let i = 0; i < pattern.length; i++) {
+                    if (pattern[i] !== '?' && pattern[i] !== source[i]) return false;
+                }
+                return;
+            }
+
+            let i = 0;
+            let lastIndex = 0;
+
+            // 第一个 * 之前部分
+            for (i = 0; pattern[i] !== '*'; i++) {
+                if (pattern[i] !== '?' && pattern[i] !== source[i]) return false;
+            }
+
+            lastIndex = i;
+
+            for (let p = 0; p < starCount - 1; p++) {
+                i += 1;
+                let subPattern = '';
+                while(pattern[i] !== '*') {
+                    subPattern += pattern[i];
+                    i += 1;
+                }
+
+                let reg = new RegExp(subPattern.replace(/?/g, '[\\s\\S]'), 'g');
+                reg.lastIndex = lastIndex;
+
+                // console.log(reg.exec(source));
+                if (!reg.exec(source)) return false;
+
+                lastIndex = reg.lastIndex;
+            }
+
+            // 最后一部分
+            for (let j = 0; j <= source.length - lastIndex && pattern[pattern.length - j] !== '*'; j++) {
+                if (
+                    pattern[pattern.length - j] !== source[source.length - j] &&
+                    pattern[pattern.length !== '?']
+                ) return false;
+            }
+            return true;
+        }
+
+        // find('abcabcabxaac', 'a*b*bx*c');
+        // find('abcabcabxaac', 'a*b?*b?x*c');
+    </script>
+</body>
+</html>
