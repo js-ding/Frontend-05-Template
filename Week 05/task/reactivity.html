@@ -1,0 +1,82 @@
+<script>
+  let callbacks = new Map();
+  let reactivities = new Map();
+  let usedReactivities = [];
+
+  let animate = {
+    name: "大灰🐱",
+    gender: "母",
+    age: 18,
+    child: {
+        name: '小灰🐱',
+        gender: '母',
+        age: 1,
+    }
+  };
+
+  /**
+   *
+   * @param {*} callback
+   * 监听代理对象上的属性？
+   * 预期：传入一个函数在对应事件执行时才调用callback
+   * 无法知道一个函数里面引用那些变量
+   */
+  function effect(callback) {
+    //   callbacks.push(callback);
+    usedReactivities = [];
+    callback();
+    console.log('usedReactivities', usedReactivities);
+
+    for (const reactivity of usedReactivities) {
+        // reactivity: [reactiveObjKey, reactiveObj]
+        // 安全处理
+        if (!callbacks.has(reactivity[0])) {
+            callbacks.set(reactivity[0], new Map());
+        }
+        if (!callbacks.get(reactivity[0]).has[reactivity[1]]) {
+            callbacks.get(reactivity[0]).set(reactivity[1], []);
+        }
+
+        callbacks.get(reactivity[0]).get(reactivity[1]).push(callback);
+        // console.log('callbacks', callbacks);
+    }
+  }
+
+  /**
+   *
+   * @param {*} obj
+   * 传入一个对象，得到一个这个对象代理对象
+   */
+  function reactive(obj) {
+    if (reactivities.has(obj)) {
+        return reactivities.get(obj);
+    }
+
+    let proxy = new Proxy(obj, {
+      get(obj, key, receiver) {
+        // 调用对象里那些属性呢？在这里可以处理
+        // 疑问：这里push数组，老师代码第一位放入对象，我这里放入键，最后达到效果一致，这里有什么讲究吗？
+        usedReactivities.push([key, obj]);
+        if (typeof obj[key] === 'object') {
+            return reactive(obj[key]);
+        }
+        return obj[key];
+      },
+      set(obj, key, value, receiver) {
+        obj[key] = value;
+        if (callbacks.get(key) && callbacks.get(key).get(obj)) {
+            for (const callback of callbacks.get(key).get(obj)) {
+                callback();
+            }
+        }
+        return obj[key];
+      },
+    });
+
+    reactivities.set(obj, proxy);
+    return proxy;
+  }
+
+  const cat = reactive(animate);
+  effect(() => console.log('触发effect', cat.child.age));
+</script>

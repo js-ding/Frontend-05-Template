@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双向绑定</title>
+</head>
+<body>
+    <input type="range" name="" id="r1">
+    <input type="range" name="" id="r2">
+    <input type="range" name="" id="r3">
+    <div id="d1" style="width: 100px;height: 100px;"></div>
+
+    <script>
+        class Reactive {
+            constructor() {
+                this.callbacks = new Map();
+                this.usedReactivities = [];
+                this.reactivities = new Map();
+            }
+
+            effect = (callback) => {
+                // 执行对应属性的回调函数 => 此时操作是哪个属性
+                // 清空之前操作记录
+                this.usedReactivities = [];
+                // 执行回调，触发get，添加记录
+                callback();
+                // 将callback在callbacks中记录，以便对象设置属性是set触发
+                // 安全处理
+                for (const reactivity of this.usedReactivities) {
+                    if (!this.callbacks.has(reactivity[0])) {
+                        this.callbacks.set(reactivity[0], new Map());
+                    }
+                    if (!this.callbacks.get(reactivity[0]).has(reactivity[1])) {
+                        this.callbacks.get(reactivity[0]).set(reactivity[1], []);
+                    }
+                    this.callbacks.get(reactivity[0]).get(reactivity[1]).push(callback);
+                }
+            }
+
+            reactive(obj) {
+                if (this.reactivities.has(obj)) {
+                    return this.reactivities.get(obj);
+                }
+
+                let proxy = new Proxy(obj, {
+                    get: (object, key, receiver) => {
+                        // 将此时操作属性记录
+                        this.usedReactivities.push([object, key]);
+                        if (typeof object[key] === 'object') return this.reactive(object[key]);
+                        return object[key];
+                    },
+                    set: (object, key, value, receiver) => {
+                        object[key] = value;
+                        if (this.callbacks.get(object) && this.callbacks.get(object).get(key)) {
+                            // console.log(this.callbacks.get(object).get(key), this.callbacks.get(object).get(key)[1]);
+                            for (const callback of this.callbacks.get(object).get(key)) {
+                                callback();
+                            }
+                        }
+                        return object[key];
+                    }
+                })
+
+                this.reactivities.set(obj, proxy);
+                return proxy;
+            }
+        }
+
+        const reactive = new Reactive();
+        // let object = {
+        //     a: 1,
+        //     b: 2,
+        //     c: {
+        //         b: 3,
+        //     }
+        // }
+        // const po = reactive.reactive(object);
+        // reactive.effect(() => console.log('effect', po.c.b));
+        let colors = {
+            r1: 0,
+            r2: 0,
+            r3: 0,
+        };
+        const po = reactive.reactive(colors);
+        // 数据驱动视图
+        reactive.effect(() => document.querySelector('#r1').value = po.r1);
+        reactive.effect(() => document.querySelector('#r2').value = po.r2);
+        reactive.effect(() => document.querySelector('#r3').value = po.r3);
+
+        document.querySelector("#r1").addEventListener('input', (e) => po.r1 = e.target.value);
+        document.querySelector("#r2").addEventListener('input', (e) => po.r2 = e.target.value);
+        document.querySelector("#r3").addEventListener('input', (e) => po.r3 = e.target.value);
+
+        reactive.effect(() => document.querySelector('#d1').style.backgroundColor = `rgb(${po.r1}, ${po.r2}, ${po.r3})`);
+    </script>
+</body>
+</html>
