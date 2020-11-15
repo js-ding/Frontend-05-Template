@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BNF</title>
+</head>
+<body>
+    
+    <script>
+        /** 
+            <MultiplicativeExpression>::= <Number>
+                | <MultiplicativeExpression> * <Number>
+                | <MultiplicativeExpression> / <Number>
+
+            <AddtiveExpression>::= <MultiplicativeExpression>
+                | <MultiplicativeExpression> + <AddtiveExpression>
+                | <MultiplicativeExpression> - <AddtiveExpression>
+
+            BracketsExpression::= '('<AddtiveExpression>')'
+        */
+
+        const reg = /([0-9\.]+)|([ \t]+)|([\n\r]+)|(\+)|(\-)|(\*)|(\/)|(\()|(\))/g;
+        const dictionary = ['Number', 'WhiteSpace', 'LineTerminator', '+', '-', '*', '/', '(', ')'];
+
+        // 拿到 { type: ..., value: ... } generator 结构
+        function* tokenzie(source) {
+            let result = null; // 匹配结果
+            let lastIndex = 0; // 记录下一个匹配下标
+
+            while (true) {
+                lastIndex = reg.lastIndex;
+                result = reg.exec(source);
+                // console.log(lastIndex, reg.lastIndex, result);  
+                if (!result) break;
+                if (reg.lastIndex - lastIndex > result[0].length) break;
+
+                let token = {
+                    type: null,
+                    value: null
+                };
+
+                for (let i = 1; i <= dictionary.length; i++) {
+                    // 注意这里是从 1 开始遍历，exec第0位是匹配到当前值，从1开始和 reg 使用（）包起来位数相对应
+                    if (result[i]) {
+                        token.type = dictionary[i - 1];
+                    }
+                }
+                token.value = result[0];
+
+                yield token;
+            }
+
+            yield {
+                type: 'EOF',
+            };
+        }
+
+        let source = [];
+
+        for (const token of tokenzie('1024 * (1 + 2)')) {
+            // console.log(token, 'token');
+            // 排除空格、换行等符号
+            if (['WhiteSpace', 'LineTerminator'].indexOf(token.type) > -1) continue;
+            source.push(token);
+        }
+
+        function BracketsExpression(source) {
+            console.log(source)
+            // if (!!source && source.length > 0) {
+            //     source.findIndex(s => s.type === '')
+            // }
+        }
+
+        function MultiplicativeExpression(source) {
+            if (source[0].type === 'Number') {
+                const node = {
+                    type: 'MultiplicativeExpression',
+                    children: [source[0]]
+                };
+                source[0] = node;
+
+                return MultiplicativeExpression(source);
+            }
+            if (source[0].type === 'MultiplicativeExpression' && source[1] && source[1].type === '*') {
+                let node = {
+                    type: 'MultiplicativeExpression',
+                    operator: '*',
+                    children: [],
+                };
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return MultiplicativeExpression(source);
+            }
+            if (source[0].type === 'MultiplicativeExpression' && source[1] && source[1].type === '/') {
+                let node = {
+                    type: 'MultiplicativeExpression',
+                    operator: '/',
+                    children: [],
+                };
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return MultiplicativeExpression(source);
+            }
+            if (source[0].type === 'MultiplicativeExpression') {
+                return source[0];
+            }
+            return MultiplicativeExpression(source);
+        }
+
+        function AddtiveExpression(source) {
+            if (source[0].type === 'MultiplicativeExpression') {
+                const node = {
+                    type: 'AddtiveExpression',
+                    children: [source[0]]
+                };
+                source[0] = node;
+
+                return AddtiveExpression(source);
+            }
+            if (source[0].type === 'AddtiveExpression' && source[1] && source[1].type === '+') {
+                let node = {
+                    type: 'AddtiveExpression',
+                    operator: '+',
+                    children: [],
+                };
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                MultiplicativeExpression(source);
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return AddtiveExpression(source);
+            }
+            if (source[0].type === 'AddtiveExpression' && source[1] && source[1].type === '-') {
+                let node = {
+                    type: 'AddtiveExpression',
+                    operator: '-',
+                    children: [],
+                };
+                node.children.push(source.shift());
+                node.children.push(source.shift());
+                MultiplicativeExpression(source);
+                node.children.push(source.shift());
+                source.unshift(node);
+
+                return AddtiveExpression(source);
+            }
+            if (source[0].type === 'AddtiveExpression') {
+                return source[0];
+            }
+
+            MultiplicativeExpression(source);
+            return AddtiveExpression(source);
+        }
+
+        function Expression(source) {
+            if (source[0].type === 'AddtiveExpression' && source[1] && source[1].type === 'EOF') {
+                return {
+                    type: 'EOF',
+                    children: [source[0]],
+                };
+            }
+
+            AddtiveExpression(source);
+            return Expression(source);
+        }
+
+        // console.log(Expression(source));
+        BracketsExpression(source);
+    </script>
+</body>
+</html>
