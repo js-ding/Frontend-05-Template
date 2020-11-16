@@ -17,7 +17,7 @@
                 | <MultiplicativeExpression> + <AddtiveExpression>
                 | <MultiplicativeExpression> - <AddtiveExpression>
 
-            BracketsExpression::= '('<AddtiveExpression>')'
+            BracketsExpression::= <Number> | '('<AddtiveExpression>')'
         */
 
         const reg = /([0-9\.]+)|([ \t]+)|([\n\r]+)|(\+)|(\-)|(\*)|(\/)|(\()|(\))/g;
@@ -65,11 +65,20 @@
             source.push(token);
         }
 
+        const leftBraket = '(';
+        const rightBraket = ')';
         function BracketsExpression(source) {
-            console.log(source)
-            // if (!!source && source.length > 0) {
-            //     source.findIndex(s => s.type === '')
-            // }
+            // console.log(source);
+            // 由于时间问题, 这里只考虑一对括号情况, 边界条件未处理, 简单实现
+            if (!!source && source.length > 0) {
+                const leftIndex = source.findIndex(s => s.type === leftBraket);
+                const rightIndex = source.findIndex(s => s.type === rightBraket);
+                const _source = source.slice(leftIndex + 1, rightIndex);
+                AddtiveExpression(_source);
+                source.splice(leftIndex, rightIndex + 1 - leftIndex, _source[0]);
+                AddtiveExpression(source);
+                // console.log(source, _source);
+            }
         }
 
         function MultiplicativeExpression(source) {
@@ -168,12 +177,13 @@
                 };
             }
 
-            AddtiveExpression(source);
+            // AddtiveExpression(source);
+            BracketsExpression(source);
             return Expression(source);
         }
 
-        // console.log(Expression(source));
-        BracketsExpression(source);
+        // BracketsExpression(source);
+        console.log(Expression(source));
     </script>
 </body>
 </html>
