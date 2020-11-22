@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>realm</title>
+  </head>
+  <body>
+    <div id="container"></div>
+
+    <!-- 引入在线资源，选择你需要的 g2 版本以替换 version 变量 -->
+    <script src="https://gw.alipayobjects.com/os/lib/antv/g2/4.0.15/dist/g2.min.js"></script>
+    <script>
+      const { Chart } = G2;
+
+        // 找出 JavaScript 引擎里面 Realm 所有的对象，没有思路，一头雾水
+      const data = [
+        // { year: "1951 年", sales: 38 },
+        // { year: "1952 年", sales: 52 },
+        // { year: "1956 年", sales: 61 },
+        // { year: "1957 年", sales: 145 },
+        // { year: "1958 年", sales: 48 },
+        // { year: "1959 年", sales: 38 },
+        // { year: "1960 年", sales: 38 },
+        // { year: "1962 年", sales: 38 },
+      ];
+      const chart = new Chart({
+        container: "container",
+        autoFit: true,
+        height: 500,
+      });
+
+      chart.data(data);
+      chart.scale("sales", {
+        nice: true,
+      });
+
+      chart.tooltip({
+        showMarkers: false,
+      });
+      chart.interaction("active-region");
+
+      chart.interval().position("year*sales");
+
+      chart.render();
+    </script>
+  </body>
+</html>
