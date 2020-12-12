@@ -5,44 +5,77 @@ http.createServer((request, response) => {
     request.on('error', err => {
         console.error('request error: ', err);
     }).on('data', chunk => {
-        // 这里push不能将chunk toString ，会报错
+        console.log('chunk:', chunk.toString());
+        // 这里push时chunk不能加toString, 会报错
         body.push(chunk);
     }).on('end', () => {
         body = Buffer.concat(body).toString();
         console.log('body: ', body);
         response.writeHead(200, { 'Content-Type': 'text/html' });
-        // response.end('Hello World!!!');
-        response.end(`<html>
+        // response.end('i: hello world\n!!!');
+        // 目前html解析无法解析中文
+        response.end(`
+<html lang="en">
+
 <head>
-    <meta charset="utf-8" />
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>hover</title>
     <style>
-        #root {
-            width: 200px;
-            height: 200px;
-            background-color: yellow;
+        #circle-btn {
+            width: 800px;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgb(255,0,0);
         }
-        .father .son {
-            width: 50px;
+
+        .btn-container {
+            widht: 200px;
+            background-color: rgb(0,255,0);
+        }
+
+        button {
+            border: 0;
+            border-radius: 50px;
+            color: white;
+            background-color: rgb(0,0,255);
+            padding: 15px 20px 16px 60px;
+            text-transform: uppercase;
+            background: linear-gradient(to right, #f72585 50%, #5f55af 50%);
+            background-size: 200% 100%;
+            background-position: right bottom;
+            transition: all 2s ease;
+        }
+
+        .c {
+            flex: 1;
             height: 50px;
-            background-color: 'red';
-        }
-        body img {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: 1px solid #e6e6e6;
+            background-color: rgb(123,123,123);
         }
     </style>
 </head>
-<body>
-    <div id="root" class="root">hello world!!!</div>
-    <div class="father">
-        <div class="son">box</div>
-    </div>
-    <img src='a' alt="a" />
-</body>
-</html>`)
-    })
-}).listen(3001);
 
-console.log('server started');
+<body>
+    <div id="circle-btn" class="circle-btn">
+        <div class="btn-container">
+            <button>Hover me123123</button>
+        </div>
+        <div class="c"></div>
+    </div>
+
+
+</body>
+
+</html>
+        `)
+    })
+
+}).listen(3001, err => {
+    if (err) {
+        console.log('listen: ', err);
+    }
+});
+
+console.log('server starded');

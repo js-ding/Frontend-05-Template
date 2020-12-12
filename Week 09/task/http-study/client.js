@@ -1,49 +1,51 @@
 const net = require('net');
-const util = require('util');
-const parser = require('./parser');
+var util = require("util");
+var images = require("images");
+const parser = require('./parser.js');
+const render = require('./render.js');
 
-// 解析响应数据体
-class ChunkedParser {
+class TrunkedBodyParser {
     constructor() {
-        this.WAITING_LENGTH = 'WAITING_LENGTH';
-        this.WAITING_LENGTH_END = 'WAITING_LENGTH_END';
-        this.READING_CHUNK = 'READING_CHUNK';
-        this.WAITING_NEW_LENGTH = 'WAITING_NEW_LENGTH';
-        this.WAITING_NEW_LENGTH_END = 'WAITING_NEW_LENGTH_END';
+        this.WAITING_LEANGTH = 'WAITING_LEANGTH';                  // chunk头部长度状态
+        this.WAITING_LEANGTH_END = 'WAITING_LEANGTH_END';          // chunk头部长度结束状态
+        this.READING_THUNK = 'READING_THUNK';                      // chunk读取状态
+        this.WAITING_NEW_LENGTH = 'WAITING_NEW_LENGTH';            // chunk底部长度状态
+        this.WAITING_NEW_LENGTH_END = 'WAITING_NEW_LENGTH_END';    // chunk底部长度结束状态
 
-        this.current = this.WAITING_LENGTH;
-        this.chunkLength = 0;
-        this.content = [];
-        this.finished = false;
+        this.current = this.WAITING_LEANGTH;
+        this.thunkLength = 0;               // 记录chunk长度
+        this.content = [];                  // 记录chunk
+        this.finished = false;              // 判断chunk是否接收完毕
     }
 
-    // e\r\nHello World!!!\r\n0\r\n\r\n
-    receiverChar(chunkChar) {
-        if (this.current === this.WAITING_LENGTH) {
+    // c\r\nhello world\n\r\n0\r\n\r\n
+    receiveChar(chunkChar) {
+        if (this.current === this.WAITING_LEANGTH) {
             if (chunkChar === '\r') {
-                if (this.chunkLength === 0) {
+                if (this.thunkLength === 0) {
                     this.current = this.WAITING_NEW_LENGTH_END;
                 } else {
-                    this.current = this.WAITING_LENGTH_END;
+                    this.current = this.WAITING_LEANGTH_END;
                 }
             } else {
-                this.chunkLength *= 16; // 保证每条chunk占满16位，默认16进制
-                this.chunkLength += Number.parseInt(chunkChar, 16);
+                // 读取完长度，记录
+                this.thunkLength *= 16; // 保证每条chunk长度为16
+                this.thunkLength += Number.parseInt(chunkChar, 16);
             }
-        } else if (this.current === this.WAITING_LENGTH_END) {
+        } else if (this.current === this.WAITING_LEANGTH_END) {
             if (chunkChar === '\n') {
-                this.current = this.READING_CHUNK;
+                this.current = this.READING_THUNK;
             }
-        } else if (this.current === this.READING_CHUNK) {
+        } else if (this.current === this.READING_THUNK) {
             if (chunkChar === '\r') {
                 this.current = this.WAITING_NEW_LENGTH;
             } else {
+                this.thunkLength -= 1;
                 this.content.push(chunkChar);
-                this.chunkLength -= 1;
             }
         } else if (this.current === this.WAITING_NEW_LENGTH) {
             if (chunkChar === '\n') {
-                this.current = this.WAITING_LENGTH;
+                this.current = this.WAITING_LEANGTH;
             }
         } else if (this.current === this.WAITING_NEW_LENGTH_END) {
             this.finished = true;
@@ -51,55 +53,55 @@ class ChunkedParser {
     }
 }
 
-// 解析响应报文
 class ResponseParser {
     constructor() {
-        this.WAITING_STATUS_LINE = 'WAITING_STATUS_LINE';           // 行状态
-        this.WAITING_STATUS_LINE_END = 'WAITING_STATUS_LINE_END';   // 结束状态
-        this.WAITING_HEADER_NAME = 'WAITING_HEADER_NAME';           // 键状态
-        this.WAITING_HEADER_SPACE = 'WAITING_HEADER_SPACE';         // 键值中间状态
-        this.WAITING_HEADER_VALUE = 'WAITING_HEADER_VALUE';         // 值状态
-        this.WAITING_HEADER_END = 'WAITING_HEADER_END';             // 结束状态
-        this.WAITING_IDLE_LINE = 'WAITING_IDLE_LINE';               // 空行状态
-        this.WAITING_BODY = 'WAITING_BODY';                         // 数据体状态
+        this.WAITING_STATUS_LINE = 0;       // 行状态
+        this.WAITING_STATUS_LINE_END = 1;   // 行结尾状态
+        this.WAITING_HEADER_NAME = 2;       // 头键状态
+        this.WAITING_HEADER_SPACE = 3;      // 键值对中间空格状态
+        this.WAITING_HEADER_VALUE = 4;      // 头值状态
+        this.WAITING_HEADER_LINE_END = 5;   // 头结尾状态
+        this.WAITING_HEADER_BLOCK_LINE = 6; // 空行状态
+        this.WAITING_BODY = 7;              // 数据体状态
 
-        this.current = this.WAITING_STATUS_LINE;
-        this.statusLine = '';   // 记录行
-        this.headers = {};      // 记录头
+        this.current = this.WAITING_STATUS_LINE; // 当前状态
+        this.statusLine = '';
+        this.headers = {};
         this.headerName = '';
         this.headerValue = '';
-        this.parser = null;
+        this.bodyParser = null;
     }
 
     get isFinished() {
-        return this.parser && this.parser.finished;
+        return this.bodyParser && this.bodyParser.finished;
     }
 
     get response() {
-        return this.parser && this.parser.content.join('');
+        return this.bodyParser && this.bodyParser.content.join('');
     }
 
     receive(string) {
-        // console.log('string: ', string);
-        /**
-         *  HTTP/1.1 200 OK
-            Content-Type: text/html
-            Date: Thu, 26 Nov 2020 14:48:48 GMT
-            Connection: keep-alive
-            Transfer-Encoding: chunked
-
-            e
-            Hello World!!!
-            0
-         */
-        // 实际要处理的字符=======================================>
-        // 'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nDate: Thu, 26 Nov 2020 14:50:46 GMT\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\ne\r\nHello World!!!\r\n0\r\n\r\n'
         for (let i = 0; i < string.length; i++) {
-            this.receiveChar(string.charAt(i));
+            this.receiverChar(string.charAt(i));
         }
     }
 
-    receiveChar(char) {
+    receiverChar(char) {
+        /**
+         * 按照这个响应报文字符来处理
+         *  HTTP/1.1 200 OK
+            Content-Type: text/html
+            Date: Thu, 26 Nov 2020 08:57:18 GMT
+            Connection: keep-alive
+            Transfer-Encoding: chunked
+
+            c
+            hello world
+
+            0
+            实际处理的字符========================================>
+            HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nDate: Thu, 26 Nov 2020 09:00:13 GMT\r\nConnection: keep-alive\r\nTransfer-Encoding: chunked\r\n\r\nc\r\nhello world\n\r\n0\r\n\r\n
+         */
         if (this.current === this.WAITING_STATUS_LINE) {
             if (char === '\r') {
                 this.current = this.WAITING_STATUS_LINE_END;
@@ -114,10 +116,10 @@ class ResponseParser {
             if (char === ':') {
                 this.current = this.WAITING_HEADER_SPACE;
             } else if (char === '\r') {
-                this.current = this.WAITING_IDLE_LINE;
-                // 根据Transfer-Encoding值解析body，这里只做chunked。chunked: 分段传输，长度未知，和content-length互斥。
-                if (this.headers['Transfer-Encoding'] === 'chunked') {
-                    this.parser = new ChunkedParser();
+                this.current = this.WAITING_HEADER_BLOCK_LINE;
+                // 根据头部字段 tansfer-encoding 判断body解析方式, 这里只做了chunked 解析
+                if (this.headers['Transfer-Encoding'] === 'chunked') { // chunked：分段请求，总长度未知
+                    this.bodyParser = new TrunkedBodyParser();
                 }
             } else {
                 this.headerName += char;
@@ -128,29 +130,28 @@ class ResponseParser {
             }
         } else if (this.current === this.WAITING_HEADER_VALUE) {
             if (char === '\r') {
-                this.current = this.WAITING_HEADER_END;
-            } else {
-                this.headerValue += char;
-            }
-        } else if (this.current === this.WAITING_HEADER_END) {
-            if (char === '\n') {
-                this.current = this.WAITING_HEADER_NAME;
+                this.current = this.WAITING_HEADER_LINE_END;
                 this.headers[this.headerName] = this.headerValue;
                 this.headerName = '';
                 this.headerValue = '';
+            } else {
+                this.headerValue += char;
             }
-        } else if (this.current === this.WAITING_IDLE_LINE) {
+        } else if (this.current === this.WAITING_HEADER_LINE_END) {
+            if (char === '\n') {
+                this.current = this.WAITING_HEADER_NAME;
+            }
+        } else if (this.current === this.WAITING_HEADER_BLOCK_LINE) {
             if (char === '\n') {
                 this.current = this.WAITING_BODY;
             }
         } else if (this.current === this.WAITING_BODY) {
             // console.log(char);
-            this.parser && this.parser.receiverChar(char);
+            this.bodyParser.receiveChar(char);
         }
     }
 }
 
-// 连接服务器，拿到响应报文
 class Request {
     constructor(options) {
         this.host = options.host;
@@ -175,8 +176,8 @@ class Request {
 
     send(connection) {
         return new Promise((resolve, reject) => {
-            const parser = new ResponseParser();
-            // 连接服务
+            // TODO
+            const parser = new ResponseParser;
             if (connection) {
                 connection.write(this.toString());
             } else {
@@ -184,54 +185,81 @@ class Request {
                     host: this.host,
                     port: this.port,
                 }, () => {
-                    // console.log('this.toString: ', this.toString());
                     connection.write(this.toString());
                 });
-
-                connection.on('data', data => {
-                    console.log('=============== connection data ========');
-                    // console.log(data.toString());
-
-                    parser.receive(data.toString());
-                    if (parser.isFinished) {
-                        resolve(parser.response);
-                        connection.end();
-                    }
-                });
-                connection.on('error', err => {
-                    reject(err);
-                    connection.end();
-                });
             }
+            connection.on('data', data => {
+                console.log('====connention data: ====');
+                // console.log(data.toString());
+                /**
+                 *  HTTP/1.1 200 OK
+                    Content-Type: text/html
+                    Date: Thu, 26 Nov 2020 07:55:57 GMT
+                    Connection: keep-alive
+                    Transfer-Encoding: chunked
+
+                    c
+                    hello world
+
+                    0
+                 */
+                parser.receive(data.toString());
+                if (parser.isFinished) {
+                    resolve(parser.response);
+                    connection.end();
+                }
+            });
+            connection.on('error', err => {
+                reject(err);
+                connection.end();
+            })
         })
     }
 
     toString() {
-        // 这里下面3句为了保证报文格式，置顶
-        // 注意：这里的 \r \n 不要写错，否则会报400 Bad Request
+        // 注意这里报文格式, 特别是每行使用\r \n, 写错就会 400
         return `${this.method} ${this.path} HTTP/1.1\r
 ${Object.keys(this.headers).map(key => `${key}: ${this.headers[key]}`).join('\r\n')}\r
 \r
 ${this.bodyText}`;
-    };
+    }
 }
 
-// 发送请求
+// const getCircularReplacer = () => {
+//     const seen = new WeakSet();
+//     return (key, value) => {
+//       if (typeof value === "object" && value !== null) {
+//         if (seen.has(value)) {
+//           return;
+//         }
+//         seen.add(value);
+//       }
+//       return value;
+//     };
+//   };
+
 void async function() {
     const request = new Request({
         host: '127.0.0.1',
-        port: '3001',
+        port: 3001,
         method: 'POST',
         path: '/',
         headers: {
-            ['X-Foo2']: 'customed',
+            ['X-Foo']: 'bar',
         },
         body: {
-            name: 'markgong'
-        },
-    });
+            name: 'dinggong'
+        }
+    })
+
     const response = await request.send();
     // console.log('response:', response);
-    const html = parser.parserHtml(response);
-    console.log(util.inspect(html, {depth: null}));
+    const dom = parser.parserHtml(response);
+    // console.log(JSON.stringify(dom, getCircularReplacer(), 4)); // 报错
+    // console.log(util.inspect(dom, { depth:null })); //depth:null 展开全部层级
+    let viewport = images(800, 600);
+
+    render(viewport, dom.children[1].children[5].children[5].children[19]);
+
+    viewport.save('viewport.jpg');
 }();
