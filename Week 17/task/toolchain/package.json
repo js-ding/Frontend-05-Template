@@ -1,0 +1,17 @@
+{
+  "name": "generator-toolchain",
+  "version": "1.0.0",
+  "description": "",
+  "main": "generator/app/index.js",
+  "scripts": {
+    "yo": "yo toolchain",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "yeoman-generator": "^4.12.0"
+  },
+  "devDependencies": {}
+}
