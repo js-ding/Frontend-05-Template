@@ -1,0 +1,32 @@
+<body oncontextmenu="event.preventDefault()"></body>
+
+<script type="module">
+    import {
+        enableGesture
+    } from './gesture.js';
+    enableGesture(document.documentElement);
+    document.documentElement.addEventListener('tap', (e) => {
+        console.log('trigger tap event', e);
+    })
+    document.documentElement.addEventListener('pressStart', (e) => {
+        console.log('trigger pressStart event', e);
+    })
+    document.documentElement.addEventListener('panStart', (e) => {
+        console.log('trigger panStart event', e);
+    })
+    document.documentElement.addEventListener('pan', (e) => {
+        console.log('trigger pan event', e);
+    })
+    document.documentElement.addEventListener('pressEnd', (e) => {
+        console.log('trigger pressEnd event', e);
+    })
+    document.documentElement.addEventListener('panEnd', (e) => {
+        console.log('trigger panEnd event', e);
+    })
+    document.documentElement.addEventListener('flick', (e) => {
+        console.log('trigger flick event', e);
+    })
+    document.documentElement.addEventListener('cancel', (e) => {
+        console.log('trigger cancel event', e);
+    })
+</script>
