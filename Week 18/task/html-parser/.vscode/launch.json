@@ -1,0 +1,24 @@
+{
+    // 使用 IntelliSense 了解相关属性。 
+    // 悬停以查看现有属性的描述。
+    // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [{
+        "type": "node",
+        "request": "launch",
+        "name": "启动程序",
+        "skipFiles": [
+            "<node_internals>/**"
+        ],
+        // nodejs运行应用时使用参数
+        "runtimeArgs": [
+            // "--require", "@babel/register"
+        ],
+        "sourceMaps": true,
+        // mocha运行时使用参数
+        "args": [],
+        // "program": "${workspaceFolder}/node_modules/.bin/mocha"
+        "program": "${workspaceFolder}/src/parser.js"
+        // "program": "C:\\Users\\v_dggong\\Desktop\\l\\Frontend-05-Template\\Week 18\\task\\html-parser\\node_modules\\.bin\\mocha"
+    }]
+}
